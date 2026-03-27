@@ -9,10 +9,6 @@ conversations — particularly whether the conversation partner (clinician,
 family member, etc.) responds to the patient's cues in a clinically
 realistic, adaptive way rather than following a rigid script.
 
-Compare the output of this test against generate_conversations_testing_only.py
-(which uses thinking_level=LOW) to determine if the quality improvement
-justifies the ~2-3x cost increase.
-
 Changes from the LOW-thinking test:
   - thinking_level: low → HIGH (all 3 API call types)
   - max_output_tokens: 16384 → 32768 (transcript generation)
@@ -22,10 +18,10 @@ Changes from the LOW-thinking test:
 
 Usage:
   1. Set your API key:  export GEMINI_API_KEY="your-key-here"
-  2. Run:               python generate_conversations_testing_high_thinking.py
+  2. Run:               python generate_conversations_testing.py
   3. Output will be in: ./test_conversations_high_thinking/
 
-Cost estimate: ~$0.85-1.20 per conversation (vs ~$0.45 with LOW thinking)
+Cost estimate: ~$0.43 per conversation
 
 Requirements:
   pip install google-genai tqdm
