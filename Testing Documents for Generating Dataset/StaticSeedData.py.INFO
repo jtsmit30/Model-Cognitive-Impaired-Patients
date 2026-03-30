@@ -1,0 +1,264 @@
+#PARTNER_GUIDELINES
+#TRAIT_PARTNER_DYNAMIC
+#CONVERSATION_ARCS
+#CONVERSATION_SEEDS
+#SEVERITY_ANCHORS
+#TRAIT_OCCUPATION_NEW
+
+# ============================================================================
+# OCCUPATION TRAITS
+# ============================================================================
+# The occupation (previous) of the patient
+
+# ============================================================================
+# PARTNER DYNAMIC TRAITS
+# ============================================================================
+# How the partner handles conversational space, independent of their role.
+# Tracked by the DiversityTracker for even distribution.
+
+# ============================================================================
+# PARTNER ROLE GUIDELINES
+# ============================================================================
+# Static per role. Describes professional or relational expectations that
+# constrain how the partner behaves regardless of their dynamic trait.
+
+# ============================================================================
+# CONVERSATION ARCS
+# ============================================================================
+# Structural patterns for when and how markers appear across the conversation.
+
+# ============================================================================
+# CONVERSATION SEEDS
+# ============================================================================
+# Situational starting conditions that ground the opening exchanges.
+
+# ============================================================================
+# SEVERITY ANCHORS
+# ============================================================================
+# Behavioral definitions of mild/moderate/severe for specific clinical
+# profiles, plus a generic fallback. Injected into the prompt so the model
+# has concrete behavioral targets rather than interpreting "mild" freely.
+
+Example for TRAIT_OCCUPATION_NEW
+TRAIT_OCCUPATION_NEW = [
+    {
+        "id": "trades_labor",
+        "text": (
+            "Spent working life in a skilled trade — plumbing, carpentry, "
+            "electrical, welding, masonry, or similar. Thinks in terms of "
+            "materials, measurements, and whether things are built right. "
+            "Uses hands-on metaphors. Respects competence over credentials. "
+            "May be skeptical of people who 'just talk' for a living."
+        ),
+    },
+    {
+        "id": "service_caregiving",
+        "text": (
+            "Spent working life caring for others — nursing, teaching, "
+            "social work, childcare, elder care. Attends to other people's "
+            "comfort reflexively. Asks how the conversation partner is "
+            "doing. May minimize own needs because decades of professional "
+            "habit trained them to put others first."
+        ),
+    },
+
+Example for Partner Dynamic:
+TRAIT_PARTNER_DYNAMIC = [
+    {
+        "id": "space_filler",
+        "text": (
+            "Fills silences with chatter — comments on the room, the "
+            "weather, what they did yesterday. Not anxious, just "
+            "uncomfortable with quiet. The filler is warm and social but "
+            "reduces space for the patient to initiate. When the patient "
+            "does speak, the partner responds quickly and at length."
+        ),
+        "partner_share_offset": 0.15,
+    },
+    {
+        "id": "comfortable_with_silence",
+        "text": (
+            "Lets pauses sit without rushing to fill them. Waits for the "
+            "patient to complete a thought even when it takes several "
+            "seconds. Does not interpret silence as a problem to solve. "
+            "When they do speak, contributions are brief and purposeful. "
+            "Creates maximum conversational space for the patient."
+        ),
+        "partner_share_offset": -0.15,
+    },
+    {
+        "id": "anxious_overtalker",
+        "text": (
+            "Talks more when worried — explains, reassures, offers "
+            "solutions, asks rapid-fire questions. The over-talking comes "
+            "from care, not self-absorption. May not realise they are "
+            "dominating. When the patient gives a short response, the "
+            "partner fills the gap with more words rather than waiting."
+        ),
+        "partner_share_offset": 0.30,
+    },
+
+Example for PARTNER_GUIDELINES:
+PARTNER_GUIDELINES = {
+    "Occupational therapist": (
+        "Follows client-centered practice. Prioritises the patient's stated "
+        "goals and readiness. After two clear refusals of a specific "
+        "intervention, shifts strategy — engages with the patient's chosen "
+        "topic, looks for natural openings, or documents the refusal and "
+        "plans to revisit next session. Does NOT push through sustained "
+        "resistance. Uses activity analysis language. Focuses on function "
+        "and independence, not compliance."
+    ),
+    "Spouse": (
+        "References shared history — decades of meals, routines, children, "
+        "and unspoken understanding. May finish the patient's sentences or "
+        "correct factual details gently. Knows the patient's baseline "
+        "intimately and notices subtle changes. Emotional stakes are high; "
+        "worry may surface as nagging, hovering, or forced cheerfulness. "
+        "The relationship is the context, not the agenda."
+    ),
+
+Example for CONVERSATION_ARCS:
+CONVERSATION_ARCS = [
+    {
+        "id": "gradual_emergence",
+        "text": (
+            "Markers are absent or barely detectable in the first third of "
+            "the conversation. They emerge gradually in the middle third and "
+            "are most visible in the final third. The conversation starts "
+            "feeling normal and slowly reveals the underlying difficulty. "
+            "The partner may not notice the shift until late."
+        ),
+    },
+    {
+        "id": "present_from_start",
+        "text": (
+            "Markers are visible from the very first patient utterance. "
+            "There is no warm-up or masking period. The patient's "
+            "difficulty is immediately apparent and remains consistent "
+            "throughout. The partner responds to what is already evident."
+        ),
+    },
+
+
+Example for CONVERSATION_SEEDS:
+CONVERSATION_SEEDS = [
+    {
+        "id": "arriving_for_visit",
+        "text": (
+            "The partner has just arrived for a visit. The opening "
+            "exchanges involve greetings, settling in, and the social "
+            "rituals of arrival — taking off a coat, being offered a seat, "
+            "commenting on the journey or the weather."
+        ),
+    },
+    {
+        "id": "sharing_a_meal",
+        "text": (
+            "The conversation takes place during or immediately around a "
+            "meal — preparing food, eating together, or cleaning up. Food "
+            "is present as a shared activity and potential conversation "
+            "topic. The pace is shaped by the meal."
+        ),
+    },
+
+
+Example for SEVERITY_ANCHORS
+SEVERITY_ANCHORS = {
+    "Major Depressive Episode": {
+        "mild": (
+            "Patient is functional but noticeably subdued. Responds to "
+            "questions but does not elaborate. Shows interest in some "
+            "topics but lets others pass. Energy is lower than baseline "
+            "but the patient can sustain a full conversation. Markers are "
+            "present in roughly 25-35% of utterances — the majority of "
+            "speech sounds normal with occasional flat spots."
+        ),
+        "moderate": (
+            "Patient's reduced engagement is clearly visible. Responses "
+            "are shorter than normal. Long pauses before answering. "
+            "Minimal topic initiation — the partner carries the "
+            "conversation. Anhedonia is detectable: offers of activity are "
+            "met with indifference. Markers appear in 40-55% of "
+            "utterances. Some exchanges are near-normal; others show "
+            "clear withdrawal."
+        ),
+        "severe": (
+            "Patient is markedly withdrawn. Responses are minimal — often "
+            "1-3 words. Extended silences of 5+ seconds. May not respond "
+            "to some questions at all. Flat affect is pervasive. The "
+            "partner does most of the talking. Markers appear in 65-80% "
+            "of utterances. Moments of normal engagement are rare and "
+            "brief."
+        ),
+    },
+    "Anxiety with Depression": {
+        "mild": (
+            "Patient shows low-level worry that surfaces intermittently. "
+            "Asks a few more questions than normal — seeking reassurance "
+            "without urgency. Sleep or concentration may be mentioned in "
+            "passing. Underlying mood is slightly low but the patient is "
+            "engaged. Markers appear in 25-35% of utterances."
+        ),
+        "moderate": (
+            "Worry is a visible thread through the conversation. The "
+            "patient returns to anxious topics repeatedly. Somatic "
+            "complaints (sleep, tension, stomach) appear alongside mood "
+            "changes. Concentration lapses may be mentioned. The patient "
+            "is restless in speech — qualifying, second-guessing, asking "
+            "'what if.' Markers appear in 40-55% of utterances."
+        ),
+        "severe": (
+            "Anxiety dominates the interaction. The patient may be "
+            "agitated, speaking rapidly, or conversely frozen and "
+            "monosyllabic. Somatic symptoms are prominent and distressing. "
+            "Catastrophic thinking surfaces. The partner struggles to "
+            "provide reassurance that sticks. Markers appear in 65-80% "
+            "of utterances."
+        ),
+    },
+    "Healthy Baseline": {
+        "none": (
+            "Patient shows no significant clinical markers. Conversation "
+            "is natural, engaged, and unremarkable. The patient initiates "
+            "topics, responds with appropriate length and detail, shows "
+            "normal emotional range, and demonstrates age-appropriate "
+            "cognitive function. This is control data — markers should "
+            "appear in fewer than 10% of utterances, and only as "
+            "normal conversational variation (e.g., a brief pause is not "
+            "BEH-01 unless it is clinically elevated)."
+        ),
+        "mild": (
+            "Patient shows no significant clinical markers. Conversation "
+            "is natural, engaged, and unremarkable. This is control data."
+        ),
+        "moderate": (
+            "Patient shows no significant clinical markers. Conversation "
+            "is natural, engaged, and unremarkable. This is control data."
+        ),
+        "severe": (
+            "Patient shows no significant clinical markers. Conversation "
+            "is natural, engaged, and unremarkable. This is control data."
+        ),
+    },
+    "_generic": {
+        "mild": (
+            "Markers are present but subtle — detectable by a trained "
+            "observer but not immediately obvious. They appear in roughly "
+            "25-35% of patient utterances. The majority of the "
+            "conversation sounds normal. The patient is functional and "
+            "engaged with occasional difficulty."
+        ),
+        "moderate": (
+            "Markers are clearly present and would be noticed by an "
+            "attentive conversation partner. They appear in roughly "
+            "40-55% of patient utterances. The patient's difficulty is "
+            "evident but they can still sustain conversation with support."
+        ),
+        "severe": (
+            "Markers are prominent and pervasive. They appear in roughly "
+            "65-80% of patient utterances. The patient's difficulty "
+            "significantly impacts the conversation. The partner must "
+            "adapt substantially to maintain interaction."
+        ),
+    },

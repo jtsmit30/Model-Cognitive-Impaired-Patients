@@ -3,6 +3,7 @@ import json
 import time
 import logging
 from dataclasses import asdict
+from typing import Optional
 
 from google import genai
 from google.genai import types
@@ -21,6 +22,7 @@ from generate_conversations_testing import (
     validate_annotation,
 )
 from JsonUtils import repair_json
+from diversity import DiversityTracker
 
 
 # ---------------------------------------------------------------------------
@@ -58,6 +60,46 @@ Important guidelines for marker expression:
 - If PLC markers are active, ensure the paralinguistic annotations CONTRADICT
   the text content at specific points"""
 
+    # --- Build diversity sections (empty strings if not populated) ---
+    diversity_sections = []
+
+    if config.biography:
+        diversity_sections.append(config.biography)
+
+    if config.age_calibration:
+        diversity_sections.append(config.age_calibration)
+
+    if config.partner_description:
+        diversity_sections.append(config.partner_description)
+
+    if config.turn_distribution_description:
+        diversity_sections.append(
+            f"TURN DISTRIBUTION:\n"
+            f"  {config.turn_distribution_description}"
+        )
+
+    if config.severity_anchor:
+        diversity_sections.append(config.severity_anchor)
+
+    if config.arc_description:
+        diversity_sections.append(
+            f"CONVERSATION ARC:\n"
+            f"  {config.arc_description}"
+        )
+
+    if config.seed_description:
+        diversity_sections.append(
+            f"OPENING SITUATION:\n"
+            f"  {config.seed_description}"
+        )
+
+    if config.diversity_context:
+        diversity_sections.append(config.diversity_context)
+
+    diversity_block = "\n\n".join(diversity_sections)
+    if diversity_block:
+        diversity_block = "\n\n" + diversity_block + "\n"
+
     prompt = f"""Generate a realistic {config.num_exchanges * 2}-turn conversation between a patient
 and their conversation partner.
 
@@ -65,7 +107,7 @@ SCENARIO:
 - Patient: Age {config.patient_age}, {config.patient_gender}
 - Conversation partner: {config.partner_role} (labeled as {config.partner_label})
 - Setting: {config.setting}
-
+{diversity_block}
 CLINICAL PROFILE: {config.profile_name}
 {config.profile_description}
 
@@ -349,25 +391,67 @@ def select_markers(profile: dict, severity: str) -> list:
     return list(set(active))  # deduplicate
 
 
-def create_conversation_config(conv_id: int) -> ConversationConfig:
-    """Create a randomized conversation configuration."""
+def create_conversation_config(
+    conv_id: int,
+    tracker: Optional[DiversityTracker] = None,
+) -> ConversationConfig:
+    """Create a randomized conversation configuration.
+
+    If a DiversityTracker is provided, uses it to compose a full diversity
+    scene (biography, age calibration, partner description, arc, seed, etc.).
+    Otherwise falls back to the original bare-demographics behavior.
+    """
     profile = select_profile()
     severity = random.choice(SEVERITIES)
     partner = random.choice(PARTNERS)
+    patient_age = random.choice(PATIENT_AGES)
 
-    return ConversationConfig(
+    config = ConversationConfig(
         conversation_id=f"CONV-{conv_id:04d}",
         profile_name=profile["name"],
         profile_description=profile["description"],
         active_markers=select_markers(profile, severity),
         severity=severity if profile["core_markers"] else "none",
-        patient_age=random.choice(PATIENT_AGES),
+        patient_age=patient_age,
         patient_gender=random.choice(PATIENT_GENDERS),
         setting=random.choice(SETTINGS),
         partner_role=partner[0],
         partner_label=partner[1],
         num_exchanges=random.randint(10, 20),
     )
+
+    # --- Populate diversity fields if tracker is available ---
+    if tracker is not None:
+        scene = tracker.compose_scene(
+            profile_name=config.profile_name,
+            severity=config.severity,
+            partner_role=config.partner_role,
+            patient_age=config.patient_age,
+        )
+
+        # Composed text blocks for prompt injection
+        config.biography = scene["biography"]
+        config.age_calibration = scene["age_calibration"]
+        config.partner_description = scene["partner_description"]
+        config.severity_anchor = scene["severity_anchor"]
+        config.arc_description = scene["arc_description"]
+        config.seed_description = scene["seed_description"]
+        config.turn_distribution_share = scene["turn_distribution_share"]
+        config.turn_distribution_category = scene["turn_distribution_category"]
+        config.turn_distribution_description = scene["turn_distribution_description"]
+        config.diversity_context = scene["diversity_context"]
+
+        # Trait IDs for metadata persistence
+        config.communication_style_id = scene["communication_style_id"]
+        config.vulnerability_style_id = scene["vulnerability_style_id"]
+        config.social_orientation_id = scene["social_orientation_id"]
+        config.life_anchors_id = scene["life_anchors_id"]
+        config.occupation_id = scene["occupation_id"]
+        config.partner_dynamic_id = scene["partner_dynamic_id"]
+        config.arc_id = scene["arc_id"]
+        config.seed_id = scene["seed_id"]
+
+    return config
 
 
 def generate_conversation(

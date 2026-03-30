@@ -9,6 +9,10 @@ conversations — particularly whether the conversation partner (clinician,
 family member, etc.) responds to the patient's cues in a clinically
 realistic, adaptive way rather than following a rigid script.
 
+Compare the output of this test against generate_conversations_testing_only.py
+(which uses thinking_level=LOW) to determine if the quality improvement
+justifies the ~2-3x cost increase.
+
 Changes from the LOW-thinking test:
   - thinking_level: low → HIGH (all 3 API call types)
   - max_output_tokens: 16384 → 32768 (transcript generation)
@@ -18,10 +22,10 @@ Changes from the LOW-thinking test:
 
 Usage:
   1. Set your API key:  export GEMINI_API_KEY="your-key-here"
-  2. Run:               python generate_conversations_testing.py
+  2. Run:               python generate_conversations_testing_high_thinking.py
   3. Output will be in: ./test_conversations_high_thinking/
 
-Cost estimate: ~$0.43 per conversation
+Cost estimate: ~$0.85-1.20 per conversation (vs ~$0.45 with LOW thinking)
 
 Requirements:
   pip install google-genai tqdm
@@ -221,6 +225,27 @@ class ConversationConfig:
     partner_role: str
     partner_label: str
     num_exchanges: int
+    # --- Diversity system fields (all optional for backward compat) ---
+    # Composed text blocks for prompt injection
+    biography: Optional[str] = None
+    age_calibration: Optional[str] = None
+    partner_description: Optional[str] = None
+    severity_anchor: Optional[str] = None
+    arc_description: Optional[str] = None
+    seed_description: Optional[str] = None
+    turn_distribution_share: Optional[float] = None
+    turn_distribution_category: Optional[str] = None
+    turn_distribution_description: Optional[str] = None
+    diversity_context: Optional[str] = None
+    # Trait IDs for metadata persistence and tracker resume
+    communication_style_id: Optional[str] = None
+    vulnerability_style_id: Optional[str] = None
+    social_orientation_id: Optional[str] = None
+    life_anchors_id: Optional[str] = None
+    occupation_id: Optional[str] = None
+    partner_dynamic_id: Optional[str] = None
+    arc_id: Optional[str] = None
+    seed_id: Optional[str] = None
 
 
 @dataclass

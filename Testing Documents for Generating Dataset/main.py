@@ -27,6 +27,7 @@ from PromptGenerationLogik import (
     generate_conversation,
     select_markers,
 )
+from diversity import DiversityTracker
 
 
 def main():
@@ -114,11 +115,20 @@ def main():
             f"skipping those."
         )
 
+    # Initialize diversity tracker and restore state from any existing runs
+    tracker = DiversityTracker()
+    if meta_dir.exists():
+        restored = tracker.load_existing(meta_dir)
+        if restored:
+            logging.info(
+                f"DiversityTracker restored {restored} conversations."
+            )
+
     # Generate conversation configs
     configs = []
     conv_id = args.start_id
     while len(configs) < args.num:
-        config = create_conversation_config(conv_id)
+        config = create_conversation_config(conv_id, tracker=tracker)
         if config.conversation_id not in existing:
             configs.append(config)
         conv_id += 1
@@ -147,6 +157,11 @@ def main():
 
         save_conversation(result, output_dir, model_id)
         results.append(result)
+
+        # Record in diversity tracker (updates total count for batch context)
+        if result.error is None:
+            from dataclasses import asdict
+            tracker.record_conversation(asdict(config))
 
         # Rate limiting
         is_last_item = (i == len(configs) - 1)
@@ -201,6 +216,15 @@ def main():
 
                     severity = random.choice(["mild", "moderate", "severe"])
                     partner = random.choice(PARTNERS)
+                    patient_age = random.choice(PATIENT_AGES)
+
+                    # Use tracker for diversity on boost configs too
+                    scene = tracker.compose_scene(
+                        profile_name=boost_profile["name"],
+                        severity=severity,
+                        partner_role=partner[0],
+                        patient_age=patient_age,
+                    )
 
                     boost_config = ConversationConfig(
                         conversation_id=f"CONV-{boost_id:04d}",
@@ -208,12 +232,30 @@ def main():
                         profile_description=boost_profile["description"],
                         active_markers=select_markers(boost_profile, severity),
                         severity=severity,
-                        patient_age=random.choice(PATIENT_AGES),
+                        patient_age=patient_age,
                         patient_gender=random.choice(PATIENT_GENDERS),
                         setting=random.choice(SETTINGS),
                         partner_role=partner[0],
                         partner_label=partner[1],
                         num_exchanges=random.randint(10, 20),
+                        biography=scene["biography"],
+                        age_calibration=scene["age_calibration"],
+                        partner_description=scene["partner_description"],
+                        severity_anchor=scene["severity_anchor"],
+                        arc_description=scene["arc_description"],
+                        seed_description=scene["seed_description"],
+                        turn_distribution_share=scene["turn_distribution_share"],
+                        turn_distribution_category=scene["turn_distribution_category"],
+                        turn_distribution_description=scene["turn_distribution_description"],
+                        diversity_context=scene["diversity_context"],
+                        communication_style_id=scene["communication_style_id"],
+                        vulnerability_style_id=scene["vulnerability_style_id"],
+                        social_orientation_id=scene["social_orientation_id"],
+                        life_anchors_id=scene["life_anchors_id"],
+                        occupation_id=scene["occupation_id"],
+                        partner_dynamic_id=scene["partner_dynamic_id"],
+                        arc_id=scene["arc_id"],
+                        seed_id=scene["seed_id"],
                     )
                     boost_id += 1
 
@@ -223,6 +265,9 @@ def main():
                     )
                     save_conversation(boost_result, output_dir, model_id)
                     boost_results.append(boost_result)
+
+                    if boost_result.error is None:
+                        tracker.record_conversation(scene)
 
             # Refresh the generation report
             all_results = results + boost_results
