@@ -1,17 +1,10 @@
 from collections import deque
-from multiprocessing.dummy import freeze_support
-
-from sympy import true
 from ultralytics import YOLO
-from PIL import Image, ImageTk
 import numpy as np
-import tkinter as tk
 import cv2
-import os
 import sys
 import torch
 import ultralytics
-from ultralytics.utils.plotting import Annotator
 import threading
 
 #Author : Owen Reid
