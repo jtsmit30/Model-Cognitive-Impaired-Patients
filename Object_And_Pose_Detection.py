@@ -1,3 +1,4 @@
+import time
 from collections import deque
 from ultralytics import YOLO
 import numpy as np
@@ -6,6 +7,7 @@ import sys
 import torch
 import ultralytics
 import threading
+import time
 
 #Author : Owen Reid
 
@@ -32,6 +34,12 @@ annotated_frame = None
 lock = threading.Lock()
 running = True
 frame_count = 0
+#Webcame
+#SOURCE = 0
+
+#Video
+SOURCE = "C:\\Users\\Socce\\OneDrive\\Pictures\\Camera Roll 1\\WIN_20260323_02_10_52_Pro.mp4"
+
 
 # Check to see if GPU is available
 
@@ -43,19 +51,18 @@ print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "NO GPU")
 print(ultralytics.__version__)
 
 # validation for keypoints being in frame
-def is_valid_point(point):
-    FRAME_HEIGHT = frame.shape[0]
+def is_valid_point(point, frame_height):
 
     return (
         point is not None and
         len(point) == 2 and
-        0 < point[1] < FRAME_HEIGHT
+        0 < point[1] < frame_height
     )
 
 
 #each keypoint stores an array with the following values: [x, y, visibility]
 #for visibility, 0 = keypoint doesn't exist, 1 = keypoint exists but isn't visible in frame, 2 = fully visible
-def determine_pose(keypoints):
+def determine_pose(keypoints, frame_height):
     for person in keypoints:
         if len(person) <= 10:
             continue
@@ -96,8 +103,6 @@ def determine_pose(keypoints):
                 if len(diffs) > 0:
                     sign_changes = np.sum(np.diff(np.sign(diffs)) != 0)
 
-                    print(sign_changes)
-
                     # Check for direction changes to see if waving has happened
                     if sign_changes >= 4:
 
@@ -118,48 +123,55 @@ def determine_pose(keypoints):
 
 
 
-            #sitting -- check to see if the difference between the hip and knee heights is small
-            right_knee = person[15]
-            left_knee = person[14]
-            left_hip = person[12]
-            right_hip = person[13]
+        #sitting -- check to see if the difference between the hip and knee heights is small
+        right_knee = person[15]
+        left_knee = person[14]
+        left_hip = person[12]
+        right_hip = person[13]
 
-            if all(is_valid_point(p) for p in [right_knee, left_knee, right_hip, left_hip]):
-                if not (right_knee is None or right_hip is None or left_knee is None or left_hip is None):
+        if all(is_valid_point(p, frame_height) for p in [right_knee, left_knee, right_hip, left_hip]):
 
-                    avg_knee_y = (right_knee[1] + left_knee[1]) / 2
-                    avg_hip_y = (right_hip[1] + left_hip[1]) / 2
+                avg_knee_y = (right_knee[1] + left_knee[1]) / 2
+                avg_hip_y = (right_hip[1] + left_hip[1]) / 2
 
-                    print(avg_knee_y, avg_hip_y)
-                    print(avg_hip_y - avg_knee_y)
+                if avg_hip_y < avg_knee_y and abs(avg_hip_y - avg_knee_y) < 25:
+                    if "Sitting" not in detected_poses:
+                        detected_poses.append("Sitting")
+                        print(detected_poses)
 
-                    if abs(avg_hip_y - avg_knee_y) < 5:
-                        if "Sitting" not in detected_poses:
-                            detected_poses.append("Sitting")
-                            print(detected_poses)
+            # Laying Down
 
-                # Laying Down
-
-                #Falling Detection
+            #Falling Detection
 
 
 # Webcam Capture Thread
 
 def capture_thread():
-    global frame
-    cap = cv2.VideoCapture(0)
+    global frame, SOURCE, frame_count
+    cap = cv2.VideoCapture(SOURCE)
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps <= 0:
+        fps = 30
+
+    delay = 1/fps
 
     if not cap.isOpened():
         print("Webcam failed")
         return
 
     while running:
+        start_time = time.time()
+
         ret, img = cap.read()
         if not ret:
-            continue
+            break
 
         with lock:
             frame = img.copy()
+
+        elapsed_time = time.time() - start_time
+        time.sleep(max(0, delay - elapsed_time))
 
     cap.release()
 
@@ -171,12 +183,13 @@ def inference_thread():
 
     while running:
         if frame is None:
+            # Prevents wasting CPU cycles
+            time.sleep(0.01)
             continue
-
-        frame_count = frame_count + 1
 
         # Prevents multiple threads from accessing this data at the same time
         with lock:
+            frame_count += 1
             img = frame.copy()
 
         if frame_count % 10 != 0:
@@ -191,7 +204,7 @@ def inference_thread():
         for r in results:
             if r.keypoints is not None and len(r.keypoints.xy) > 0:
                 keypoints = r.keypoints.xy.cpu().numpy()
-                determine_pose(keypoints)
+                determine_pose(keypoints, frame.shape[0])
 
         # Add detected objects to array
         for r in results:
@@ -242,6 +255,7 @@ cv2.destroyAllWindows()
 
 def main():
     pass
+
 
 if __name__ == '__main__':
     main()
