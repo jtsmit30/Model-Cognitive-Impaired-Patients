@@ -14,6 +14,7 @@ This pipeline produces realistic patient-partner conversations with utterance-le
 | `generate_conversations_testing.py` | Core generation logic: transcript parsing, dataclasses, validation, quality scoring |
 | `PromptGenerationLogik.py` | Prompt construction, diversity system, and annotation chunking |
 | `JsonUtils.py` | JSON parsing, repair, and atomic file I/O |
+| `ArcsSeedsRolesAnchorsOcupations.py` | Contains the conversation seed information for diversity.py, not included in the project repo.
 
 ## Diversity System
 
