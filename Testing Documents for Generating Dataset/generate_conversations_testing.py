@@ -254,6 +254,7 @@ class GeneratedConversation:
     config: dict
     transcript: Optional[str] = None
     annotation: Optional[str] = None
+    prompts: dict = field(default_factory=dict)  # all prompts sent to the model
     generation_time: float = 0.0
     annotation_time: float = 0.0
     error: Optional[str] = None
@@ -731,6 +732,12 @@ def save_conversation(result: GeneratedConversation, output_dir: Path,
         ),
     }
     atomic_write_json(meta_path, meta)
+
+    # Save prompts (generation, annotation chunks, session summary)
+    if result.prompts:
+        prompts_dir = output_dir / "prompts"
+        prompts_path = prompts_dir / f"{conv_id}_prompts.json"
+        atomic_write_json(prompts_path, result.prompts)
 
 
 def _is_valid_annotation(annotation_text: str) -> bool:

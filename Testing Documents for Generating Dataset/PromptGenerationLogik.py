@@ -29,10 +29,22 @@ from diversity import DiversityTracker
 # Prompt templates
 # ---------------------------------------------------------------------------
 
-SYSTEM_INSTRUCTION = """You are an expert clinical conversation simulator specializing in 
-generating realistic patient dialogues for mental health and cognitive decline research. 
-Your conversations must be naturalistic, clinically plausible, and contain specific 
+SYSTEM_INSTRUCTION = """You are an expert clinical conversation simulator specializing in
+generating realistic patient dialogues for mental health and cognitive decline research.
+Your conversations must be naturalistic, clinically plausible, and contain specific
 behavioral markers as instructed. You never break character or add meta-commentary."""
+
+ANNOTATION_SYSTEM_INSTRUCTION = (
+    "You are a clinical conversation annotation system. "
+    "Respond ONLY with valid JSON. No markdown formatting, "
+    "no backticks, no explanation text. Ensure all strings "
+    "are properly closed and all brackets are matched."
+)
+
+SUMMARY_SYSTEM_INSTRUCTION = (
+    "You are a clinical conversation annotation system. "
+    "Respond ONLY with valid JSON."
+)
 
 
 def build_generation_prompt(config: ConversationConfig) -> str:
@@ -475,6 +487,10 @@ def generate_conversation(
     # ----- Step 1: Generate the conversation transcript -----
     generation_prompt = build_generation_prompt(config)
 
+    # Capture prompts for analysis/reproducibility
+    result.prompts["system_instruction"] = SYSTEM_INSTRUCTION
+    result.prompts["generation"] = generation_prompt
+
     transcript_ok = False
     for attempt in range(max_retries):
         try:
@@ -586,6 +602,8 @@ def generate_conversation(
             chunk_index=chunk_idx,
             total_chunks=total_chunks,
         )
+        result.prompts.setdefault("annotation_chunks", []).append(chunk_prompt)
+        result.prompts["annotation_system_instruction"] = ANNOTATION_SYSTEM_INSTRUCTION
 
         chunk_parsed = None
         for attempt in range(max_retries):
@@ -595,12 +613,7 @@ def generate_conversation(
                     model=model_id,
                     contents=chunk_prompt,
                     config=types.GenerateContentConfig(
-                        system_instruction=(
-                            "You are a clinical conversation annotation system. "
-                            "Respond ONLY with valid JSON. No markdown formatting, "
-                            "no backticks, no explanation text. Ensure all strings "
-                            "are properly closed and all brackets are matched."
-                        ),
+                        system_instruction=ANNOTATION_SYSTEM_INSTRUCTION,
                         temperature=0.5,
                         max_output_tokens=16384,
                         response_mime_type="application/json",
@@ -673,16 +686,15 @@ def generate_conversation(
         summary_prompt = build_session_summary_prompt(
             result.transcript, config, all_utterance_annotations
         )
+        result.prompts["session_summary"] = summary_prompt
+        result.prompts["summary_system_instruction"] = SUMMARY_SYSTEM_INSTRUCTION
         for attempt in range(max_retries):
             try:
                 response = client.models.generate_content(
                     model=model_id,
                     contents=summary_prompt,
                     config=types.GenerateContentConfig(
-                        system_instruction=(
-                            "You are a clinical conversation annotation system. "
-                            "Respond ONLY with valid JSON."
-                        ),
+                        system_instruction=SUMMARY_SYSTEM_INSTRUCTION,
                         temperature=0.5,
                         max_output_tokens=8192,
                         response_mime_type="application/json",
