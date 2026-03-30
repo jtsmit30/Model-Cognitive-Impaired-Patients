@@ -39,4 +39,10 @@ The project is in the **data generation phase** — building the annotated conve
 - Layer 3 LLM fine-tuning
 - Edge deployment optimization
 
+#TODO for Computer Vision and Pose Detection
+
+- Reset Waving deque if enough direction changes aren't made
+- Try to normalize coordinates for sitting detection
+  
+
   
