@@ -1,4 +1,5 @@
 from urllib import response
+from collections import deque
 
 from google import genai
 import os
@@ -23,20 +24,34 @@ while x not in [1, 2, 3, 4, 5]:
     except ValueError:
         print("Invalid input. Please enter a valid number.")
 
+conversation_history = deque(maxlen=100)
 
 def free_form_conversation():
-    
     while True:
-        string = input("Enter a prompt for Gemini: ") + "keep your response concise"
-        response = client.models.generate_content(
-            model="gemini-3-flash-preview", contents=string
+        user_prompt = input("Enter a prompt for Gemini: ")
+        prompt_with_history = "\n".join(
+            [f"User: {turn['user']}\nGemini: {turn['assistant']}" for turn in conversation_history]
         )
-        print(response.text)
+        full_prompt = f"{prompt_with_history}\n{user_prompt}\nPlease keep your response concise."
+        response = client.models.generate_content(
+            model="gemini-3-flash-preview", contents=full_prompt
+        )
+        assistant_text = response.text
+
+        conversation_history.append({
+            "user": user_prompt,
+            "assistant": assistant_text,
+        })
+
+        print(assistant_text)
         print("Do you want to continue the conversation? (yes/no)")
         continue_conversation = input().lower()
         if continue_conversation != "yes":
+            #print("Conversation history:")
+            #for turn in list(conversation_history):
+            #    print(f"User: {turn['user']}")
+            #    print(f"Gemini: {turn['assistant']}\n")
             break
-    pass
 def adaptive_questioning():
 
     string = "Keep your response concise. Using complex reasoning, based on one of the most prevalent criteria that you believe is present in the patient, including memory, attention, function, and visuospatial abilities, ask a single question:\n"
