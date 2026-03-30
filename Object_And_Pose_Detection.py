@@ -24,7 +24,7 @@ model.to(device)
 detected_objects = []
 detected_poses = []
 
-wrist_history = deque(maxlen=15)
+wrist_history = deque(maxlen=100)
 
 # Shared data
 frame = None
@@ -56,35 +56,65 @@ def is_valid_point(point):
 #each keypoint stores an array with the following values: [x, y, visibility]
 #for visibility, 0 = keypoint doesn't exist, 1 = keypoint exists but isn't visible in frame, 2 = fully visible
 def determine_pose(keypoints):
-    if keypoints is None or len(keypoints) == 0:
-        return
-
     for person in keypoints:
         if len(person) <= 10:
             continue
 
-        wrist = person[10]      # right wrist
-        shoulder = person[6]    # right shoulder
+        wrist = person[10]  # right wrist
+        shoulder = person[6]  # right shoulder
 
         # skip invalid points
-        if not (wrist is None or shoulder is None):
-            # if confidence exists, check it
-            if not(len(wrist) == 3 and wrist[2] < 0.5):
-                # check if wrist is above shoulder
-                if wrist[1] < shoulder[1]:
-                    wrist_history.append(float(wrist[0]))
+        if wrist is None or shoulder is None:
+            continue
 
-                    diffs = np.diff(wrist_history)
+        # if confidence exists, check it
+        if len(wrist) == 3 and wrist[2] < 0.5:
+            continue
+
+        # check if wrist is above shoulder
+        if wrist[1] < shoulder[1]:
+            wrist_history.append(float(wrist[0]))
+
+            # We need enough history to detect a wave
+            if len(wrist_history) > 10:
+
+                # Smooth Movements
+                window = 5
+                smoothed_history = np.convolve(wrist_history, np.ones(window) / window, mode='valid')
+
+                # Get the differences of the smoothed data
+                diffs = np.diff(smoothed_history)
+
+                # Create movement dead-zone to filter out jitters
+                #sets anything less than 5 to 0 which gets removed by the function below
+                diffs[np.abs(diffs) < 5] = 0
+
+                # Remove zeros so pauses don't cause double direction changes
+                diffs = diffs[diffs != 0]
+
+                # Check sign changes
+                if len(diffs) > 0:
                     sign_changes = np.sum(np.diff(np.sign(diffs)) != 0)
 
-                    if sign_changes >= 8:
-                        travel_distance = max(wrist_history) - min(wrist_history)
+                    print(sign_changes)
 
-                        if travel_distance > 50:
+                    # Check for direction changes to see if waving has happened
+                    if sign_changes >= 4:
+
+                        # check the distance the hand travelled
+                        travel_distance = max(smoothed_history) - min(smoothed_history)
+
+                        # TODO make dynamic waving distance based on shoulder size
+                        if travel_distance > 30:
                             if "Waving" not in detected_poses:
                                 detected_poses.append("Waving")
-                                print(detected_poses)
-                                print(wrist_history)
+                                print("Waving Detected")
+
+                                wrist_history.clear()
+        else:
+            # If the wrist drops below the shoulder, clear the history
+            # so half-finished movements don't carry over to the next time they raise their hand.
+            wrist_history.clear()
 
 
 
@@ -95,7 +125,6 @@ def determine_pose(keypoints):
             right_hip = person[13]
 
             if all(is_valid_point(p) for p in [right_knee, left_knee, right_hip, left_hip]):
-                print("E")
                 if not (right_knee is None or right_hip is None or left_knee is None or left_hip is None):
 
                     avg_knee_y = (right_knee[1] + left_knee[1]) / 2
