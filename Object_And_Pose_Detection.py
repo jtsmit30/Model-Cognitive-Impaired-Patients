@@ -1,3 +1,4 @@
+import math
 import time
 from collections import deque
 from ultralytics import YOLO
@@ -23,10 +24,10 @@ model.to(device)
 #set classes from data set to look for here
 #model.set_classes()
 
+wrist_history = deque(maxlen=100)
 detected_objects = []
 detected_poses = []
-
-wrist_history = deque(maxlen=100)
+direction_changes = 0
 
 # Shared data
 frame = None
@@ -34,11 +35,11 @@ annotated_frame = None
 lock = threading.Lock()
 running = True
 frame_count = 0
-#Webcame
-#SOURCE = 0
+#Webcam
+SOURCE = 0
 
 #Video
-SOURCE = "C:\\Users\\Socce\\OneDrive\\Pictures\\Camera Roll 1\\WIN_20260323_02_10_52_Pro.mp4"
+#SOURCE = "C:\\Users\\Socce\\OneDrive\\Pictures\\Camera Roll 1\\WIN_20260323_02_10_52_Pro.mp4"
 
 
 # Check to see if GPU is available
@@ -50,98 +51,166 @@ print(torch.version.cuda)
 print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "NO GPU")
 print(ultralytics.__version__)
 
-# validation for keypoints being in frame
-def is_valid_point(point, frame_height):
+# helper function for calculating distance between two keypoints
+def calculate_distance(p1, p2):
+    return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
 
-    return (
-        point is not None and
-        len(point) == 2 and
-        0 < point[1] < frame_height
-    )
+# waving detection
+def determine_waving(person, wave_threshold):
+    global direction_changes
+    """
+    Checks if a single person is waving.
 
+    :param person: YOLO keypoints array for a single person
+    :param wave_threshold: How wide the wave must be in shoulder-widths
+    :return: True if waving, False otherwise
+
+    """
+    """
+    Calculate normalization factor: 
+    This is used to make the detection more robust from varying distances since the size of the person
+    will vary, so the persons shoulder width will be used to determine how far their hand must travel 
+    to count as a wave
+    
+    """
+    # Validation that the keypoints exist
+    if len(person) <= 10:
+        return False
+
+    l_shoulder = person[5]
+    r_shoulder = person[6]
+    r_elbow = person[8]
+    r_wrist = person[10]
+
+    # Skip if confidence scores are too low
+    if len(r_wrist) == 3 and r_wrist[2] < 0.5:
+        return False
+    if len(r_shoulder) == 3 and r_shoulder[2] < 0.5:
+        return False
+    if len(l_shoulder) == 3 and l_shoulder[2] < 0.5:
+        return False
+    if len(r_elbow) == 3 and r_elbow[2] < 0.5:
+        return False
+
+    # Calculate shoulder width for normalizing factor
+    shoulder_width = calculate_distance(l_shoulder, r_shoulder)
+
+    # Make sure factor isn't zero (shoulders overlapping in that case)
+    if shoulder_width < 1:
+        return False
+
+    # Make sure hand is raised above elbow since this will always be the case when waving
+    # wrist_y > elbow_y means the wrist is below the elbow, so clear the tracking of the wrist
+    if r_wrist[1] > r_elbow[1]:
+        wrist_history.clear()
+        return False
+
+    """
+    Add the normalized x coordinates to the wrist history
+    The objective here is to track relative to the shoulder to account for body movement while waving,
+    as well as account for distance to the camera by using the normalization factor
+    """
+    relative_x = (r_wrist[0] - r_shoulder[0]) / shoulder_width
+    wrist_history.append(float(relative_x))
+
+    # Check for Waving Motion
+
+    # Only check for a wave if we have a full buffer of frames
+    if len(wrist_history) == wrist_history.maxlen:
+        max_x = max(wrist_history)
+        min_x = min(wrist_history)
+
+        print(math.fabs(max_x - min_x))
+
+        # If the total side-to-side distance exceeds our shoulder-width threshold
+        if math.fabs(max_x - min_x) > wave_threshold:
+            # Check for Direction Changes (The "Back and Forth" check)
+            # We look at the difference between consecutive frames
+            diffs = np.diff(list(wrist_history))
+
+            # Count how many times the movement changes from left to right
+            # We only count significant moves to ignore jitters
+            for i in range(len(diffs) - 1):
+                # If product is negative, signs are different (one is +, one is -)
+                if diffs[i] * diffs[i+1] < 0:
+                    # Small deadzone so tiny jitters don't count
+                    if abs(diffs[i]) > 0.02:
+                        direction_changes += 1
+                        print(direction_changes)
+
+            # A wave should have at least 2 direction changes (Left -> Right -> Left)
+            if direction_changes >= 2:
+                wrist_history.clear()
+                return True
+
+    return False
+
+
+def determine_sitting(person, sitting_threshold):
+    """
+    Determines sitting by comparing vertical distances between the persons knees and hips
+
+    :param person: YOLO keypoints array for a single person
+    :param sitting_threshold: Minimum difference in vertical distances between the persons knees and hips
+    :return: True if sitting, False otherwise
+    """
+
+    # Validate that the keypoints are included in person
+    if len(person) <= 15:
+        return False
+
+    # We need both hips and both knees to make an accurate sitting judgment
+    # If any of these are invisible (low confidence), return False immediately
+    required_joints = [11, 12, 13, 14]  # L_hip, R_hip, L_knee, R_knee
+
+    for idx in required_joints:
+        conf = person[idx][2]
+        if conf < 0.5:  # 0.5 is the standard 'visibility' cutoff
+            return False
+
+    # Visibility Check
+    # Hips (11, 12) and Knees (13, 14)
+    # If the model returns 0 for these, we are standing too close
+    if np.any(person[11:15, :2] == 0):
+        return False
+
+    l_hip, r_hip = person[11], person[12]
+    l_knee, r_knee = person[13], person[14]
+
+    # Calculate the 'Width' of the lap (distance between knees)
+    # When sitting dead-on, your knees spread or at least stay shoulder-width apart
+    lap_width = abs(l_knee[0] - r_knee[0])
+
+    # Calculate the 'Height' of the thigh (vertical hip-to-knee)
+    thigh_height = (abs(l_knee[1] - l_hip[1]) + abs(r_knee[1] - r_hip[1])) / 2
+
+    # Compare Width to Height
+    # When standing, thigh_height is large and lap_width is small (Ratio < 1)
+    # When sitting, thigh_height shrinks and lap_width stays same or grows (Ratio > 1)
+    if thigh_height == 0: return False
+
+    sitting_ratio = lap_width / thigh_height
+
+    # If the lap is wider than the vertical height of the thighs, you're likely sitting.
+    if sitting_ratio > sitting_threshold:
+        return True
+
+    return False
 
 #each keypoint stores an array with the following values: [x, y, visibility]
 #for visibility, 0 = keypoint doesn't exist, 1 = keypoint exists but isn't visible in frame, 2 = fully visible
 def determine_pose(keypoints, frame_height):
+
     for person in keypoints:
-        if len(person) <= 10:
-            continue
 
-        wrist = person[10]  # right wrist
-        shoulder = person[6]  # right shoulder
+        if "Waving" not in detected_poses and determine_waving(person, 0.4):
+            detected_poses.append("Waving")
+            print("Waving Detected")
 
-        # skip invalid points
-        if wrist is None or shoulder is None:
-            continue
+        if "Sitting" not in detected_poses and determine_sitting(person, 1):
+            detected_poses.append("Sitting")
+            print("Sitting Detected")
 
-        # if confidence exists, check it
-        if len(wrist) == 3 and wrist[2] < 0.5:
-            continue
-
-        # check if wrist is above shoulder
-        if wrist[1] < shoulder[1]:
-            wrist_history.append(float(wrist[0]))
-
-            # We need enough history to detect a wave
-            if len(wrist_history) > 10:
-
-                # Smooth Movements
-                window = 5
-                smoothed_history = np.convolve(wrist_history, np.ones(window) / window, mode='valid')
-
-                # Get the differences of the smoothed data
-                diffs = np.diff(smoothed_history)
-
-                # Create movement dead-zone to filter out jitters
-                #sets anything less than 5 to 0 which gets removed by the function below
-                diffs[np.abs(diffs) < 5] = 0
-
-                # Remove zeros so pauses don't cause double direction changes
-                diffs = diffs[diffs != 0]
-
-                # Check sign changes
-                if len(diffs) > 0:
-                    sign_changes = np.sum(np.diff(np.sign(diffs)) != 0)
-
-                    # Check for direction changes to see if waving has happened
-                    if sign_changes >= 4:
-
-                        # check the distance the hand travelled
-                        travel_distance = max(smoothed_history) - min(smoothed_history)
-
-                        # TODO make dynamic waving distance based on shoulder size
-                        if travel_distance > 30:
-                            if "Waving" not in detected_poses:
-                                detected_poses.append("Waving")
-                                print("Waving Detected")
-
-                                wrist_history.clear()
-        else:
-            # If the wrist drops below the shoulder, clear the history
-            # so half-finished movements don't carry over to the next time they raise their hand.
-            wrist_history.clear()
-
-
-
-        #sitting -- check to see if the difference between the hip and knee heights is small
-        right_knee = person[15]
-        left_knee = person[14]
-        left_hip = person[12]
-        right_hip = person[13]
-
-        if all(is_valid_point(p, frame_height) for p in [right_knee, left_knee, right_hip, left_hip]):
-
-                avg_knee_y = (right_knee[1] + left_knee[1]) / 2
-                avg_hip_y = (right_hip[1] + left_hip[1]) / 2
-
-                if avg_hip_y < avg_knee_y and abs(avg_hip_y - avg_knee_y) < 25:
-                    if "Sitting" not in detected_poses:
-                        detected_poses.append("Sitting")
-                        print(detected_poses)
-
-            # Laying Down
-
-            #Falling Detection
 
 
 # Webcam Capture Thread
@@ -203,7 +272,7 @@ def inference_thread():
         # Send Keypoints for Pose Detection
         for r in results:
             if r.keypoints is not None and len(r.keypoints.xy) > 0:
-                keypoints = r.keypoints.xy.cpu().numpy()
+                keypoints = r.keypoints.data.cpu().numpy()
                 determine_pose(keypoints, frame.shape[0])
 
         # Add detected objects to array
