@@ -311,6 +311,7 @@ def capture_thread():
         fps = 30
 
     delay = 1/fps
+    print(delay)
 
     if not cap.isOpened():
         print("Error opening video stream")
@@ -328,7 +329,7 @@ def capture_thread():
             frame = img.copy()
 
         elapsed_time = time.time() - start_time
-        time.sleep(max(0, int(delay - elapsed_time)))
+        time.sleep(max(0, delay - elapsed_time))
 
     cap.release()
 
