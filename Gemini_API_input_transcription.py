@@ -89,9 +89,11 @@ def import_patient_report_from_txt():
     #upload patient report to a txt file, copy path and read it in to test the model's responses
     with open("C:\\Users\\Jason\\OneDrive\\Desktop\\prompt_example_1.txt", "r") as file:
         Txtfile = file.read()
-        
+    string = "Keep your response concise. You will receive data. Summarize the data and provide insight on patient risks in a report format"
+    full_prompt = f"{string}\n{Txtfile}"
+
     response = client.models.generate_content(
-        model="gemini-3-flash-preview", contents=Txtfile
+        model="gemini-3-flash-preview", contents=full_prompt
     )
     print(response.text)
     pass
