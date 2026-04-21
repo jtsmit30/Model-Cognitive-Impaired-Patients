@@ -264,9 +264,9 @@ def determine_sitting(person, sitting_threshold):
 def determine_pose(keypoints, frame_height):
     # Use for tracking how far apart detections happen
     current_time = time.time()
-    action_overlap = False
 
     for person in keypoints:
+        action_overlap = False
 
         # Person is waving
         if determine_waving(person, 0.6):
