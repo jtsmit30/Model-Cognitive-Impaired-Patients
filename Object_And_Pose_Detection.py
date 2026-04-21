@@ -44,10 +44,10 @@ lock = threading.Lock()
 running = True
 frame_count = 0
 #Webcam
-SOURCE = 0
+#SOURCE = 0
 
 #Video
-#SOURCE = "C:\\Users\\Socce\\OneDrive\\Pictures\\Camera Roll 1\\WIN_20260323_02_10_52_Pro.mp4"
+SOURCE = "C:\\Users\\Socce\\Downloads\\Untitled design.mp4"
 
 cap = cv2.VideoCapture(SOURCE)
 
@@ -362,8 +362,6 @@ def inference_thread():
 
         curr_time = time.time()
 
-        overlapping_obj = False
-
         # Send Keypoints for Pose Detection
         for r in results:
             if r.keypoints is not None and len(r.keypoints.xy) > 0:
@@ -379,6 +377,8 @@ def inference_thread():
             for box in r.boxes.data:
                 cls = int(box[5])
                 name = obj_detection.names[cls]
+
+                overlapping_obj = False
 
                 # Check for preexisting objects of the same type and which have been detected in the last 30 seconds
                 for ob in detected_objects:
