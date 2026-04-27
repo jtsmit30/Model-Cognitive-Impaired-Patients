@@ -44,10 +44,10 @@ lock = threading.Lock()
 running = True
 frame_count = 0
 #Webcam
-#SOURCE = 0
+SOURCE = 0
 
 #Video
-SOURCE = "C:\\Users\\Socce\\Downloads\\Untitled design.mp4"
+#SOURCE = "C:\\Users\\Socce\\Downloads\\Untitled design.mp4"
 
 cap = cv2.VideoCapture(SOURCE)
 
